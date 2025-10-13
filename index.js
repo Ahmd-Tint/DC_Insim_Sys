@@ -227,14 +227,13 @@ client.on("interactionCreate", async (interaction) => {
     console.log(`City: ${city}, Plate: ${plate}`);
     console.log(`Amount: ${amount}`);
     console.log(`Date/Time: ${date}, ${time} in UTC+3`);
-    console.log(`Status: Unknown`);
-    console.log(`Closed by: ${i.user.tag}`);
   } catch (err) {
     console.error("❌ Failed to save fine to JSON:", err);
   }
 });
 
 client.login(config.token);
+
 
 
 
