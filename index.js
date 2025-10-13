@@ -1,4 +1,18 @@
-const keepAlive = require('./keep_alive.js');
+
+// ===== KEEP ALIVE FOR UPTIME ROBOT =====
+const http = require("http");
+
+function keepAlive() {
+  const server = http.createServer((req, res) => {
+    res.writeHead(200);
+    res.end("Bot is alive!");
+  });
+
+  server.listen(3000, () => {
+    console.log("✅ Keep-alive server running on port 3000");
+  });
+}
+
 keepAlive();
 
 const { Client, GatewayIntentBits, SlashCommandBuilder, Routes, EmbedBuilder, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
@@ -212,6 +226,7 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 client.login(config.token);
+
 
 
 
