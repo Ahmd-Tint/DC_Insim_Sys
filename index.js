@@ -3,8 +3,8 @@ keepAlive();
 
 const { Client, GatewayIntentBits, SlashCommandBuilder, Routes, EmbedBuilder, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
 const { REST } = require("@discordjs/rest");
-const fs = require("fs");
-const config = JSON.parse(fs.readFileSync(new URL("./config.json", import.meta.url)));
+onst fs = require("fs-extra");
+const config = fs.readJsonSync("./config.json");
 
 
 const client = new Client({
@@ -212,4 +212,5 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 client.login(config.token);
+
 
