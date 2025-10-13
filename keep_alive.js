@@ -1,15 +1,13 @@
-// keep_alive.js
-const express = require('express');
-const server = express();
+import express from "express";
 
-server.all('/', (req, res) => {
-  res.send('Bot is running!');
+const app = express();
+
+app.get("/", (req, res) => {
+  res.send("Bot is alive!");
 });
 
-function keepAlive() {
-  server.listen(3000, () => {
-    console.log('Server is Ready!');
+export const keepAlive = () => {
+  app.listen(3000, () => {
+    console.log("✅ Keep-alive server running on port 3000");
   });
-}
-
-module.exports = keepAlive;
+};
