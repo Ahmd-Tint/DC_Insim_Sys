@@ -1,10 +1,10 @@
-const keepAlive = require('./keep_alive.js');
+import keepAlive from './keep_alive.js';
 keepAlive();
 
 import { Client, GatewayIntentBits, SlashCommandBuilder, Routes, EmbedBuilder, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from "discord.js";
 import { REST } from "@discordjs/rest";
-import fs from "fs";
-const config = JSON.parse(fs.readFileSync(new URL("./config.json", import.meta.url)));
+import fs from 'fs';
+const config = JSON.parse(fs.readFileSync(new URL('./config.json', import.meta.url)));
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
@@ -211,5 +211,6 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 client.login(config.token);
+
 
 
