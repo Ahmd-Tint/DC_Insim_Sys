@@ -1,3 +1,8 @@
+if (global.botStarted) {
+  console.log("Bot instance already running, exiting duplicate instance.");
+  process.exit();
+}
+global.botStarted = true;
 
 // ===== KEEP ALIVE FOR UPTIME ROBOT =====
 const http = require("http");
@@ -236,6 +241,7 @@ client.on("interactionCreate", async (interaction) => {
 
 client.login(config.token);
 console.log('version 23:19');
+
 
 
 
