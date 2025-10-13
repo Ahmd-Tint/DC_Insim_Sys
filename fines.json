@@ -1,0 +1,34 @@
+[
+  {
+    "fineNumber": 8342580749,
+    "officer": "ahmed_8117",
+    "officerId": "1164976792478679190",
+    "finedUser": "ahmed_8117",
+    "finedUserId": "1164976792478679190",
+    "reason": "test",
+    "city": "test",
+    "plate": "test",
+    "amount": 0,
+    "date": "2025-10-11",
+    "time": "12:19",
+    "status": "closed",
+    "closedBy": "ahmed_8117",
+    "closedAt": "2025-10-11T09:20:03.878Z"
+  },
+  {
+    "fineNumber": 1751683778,
+    "officer": "ahmed_8117",
+    "officerId": "1164976792478679190",
+    "finedUser": "ahmed_8117",
+    "finedUserId": "1164976792478679190",
+    "reason": "vid",
+    "city": "vid",
+    "plate": "vid",
+    "amount": 0,
+    "date": "2025-10-13",
+    "time": "19:17",
+    "status": "closed",
+    "closedBy": "ahmed_8117",
+    "closedAt": "2025-10-13T16:17:26.982Z"
+  }
+]
