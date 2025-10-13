@@ -145,10 +145,4 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 client.login(config.token);
-
-
-
-
-
-
-
+console.log('version 1056');
