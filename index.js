@@ -220,12 +220,22 @@ client.on("interactionCreate", async (interaction) => {
     });
     await fs.writeJson(finesFile, fines, { spaces: 2 });
     console.log(`✅ Fine #${fineNumber} logged to fines.json`);
+    console.log("Fine Details:");
+    console.log(`Officer: ${officer.tag} (${officer.id})`);
+    console.log(`Fined User: ${finedUser} (${finedUser.id})`);
+    console.log(`Reason: ${reason}`);
+    console.log(`City: ${city}, Plate: ${plate}`);
+    console.log(`Amount: ${amount}`);
+    console.log(`Date/Time: ${date}, ${time} in UTC+3`);
+    console.log(`Status: Unknown`);
+    console.log(`Closed by: ${i.user.tag}`);
   } catch (err) {
     console.error("❌ Failed to save fine to JSON:", err);
   }
 });
 
 client.login(config.token);
+
 
 
 
