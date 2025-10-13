@@ -1,13 +1,12 @@
-import express from "express";
+const express = require("express");
 
 const app = express();
+app.get("/", (req, res) => res.send("Bot is alive!"));
 
-app.get("/", (req, res) => {
-  res.send("Bot is alive!");
-});
-
-export const keepAlive = () => {
-  app.listen(3000, () => {
-    console.log("✅ Keep-alive server running on port 3000");
+const keepAlive = () => {
+  app.listen(process.env.PORT || 3000, () => {
+    console.log("✅ Keep-alive server running");
   });
 };
+
+module.exports = keepAlive;
