@@ -68,8 +68,13 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName !== "fine") return;
 
-  interaction.reply('<a:2366_Loading_Pixels:1427600726691156100> Loading. Please be patient.')
+  
+  await interaction.deferReply({ ephemeral: true });
 
+  
+  await interaction.editReply(`<a:2366_Loading_Pixels:1427600726691156100> Loading...\nPlease be patient`);
+
+  
   const officer = interaction.user;
   const finedUser = interaction.options.getUser("user");
   const reason = interaction.options.getString("reason");
@@ -241,7 +246,8 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 client.login(config.token);
-console.log('version 1:22');
+console.log('version 1:41');
+
 
 
 
