@@ -68,6 +68,8 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName !== "fine") return;
 
+  interaction.reply('<a:2366_Loading_Pixels:1427600726691156100> Loading. Please be patient.')
+
   const officer = interaction.user;
   const finedUser = interaction.options.getUser("user");
   const reason = interaction.options.getString("reason");
@@ -160,8 +162,6 @@ client.on("interactionCreate", async (interaction) => {
   console.log(`${amount}`);
   console.log(`================================================`);
   const msg = await moroorChannel.send({ content: `<@${finedUser.id}>`, embeds: [embed], components: [row] });
-  await interaction.reply({ content: `✅ Fine issued successfully! Case logged in <#${moroorChannel.id}>`, ephemeral: true });
-
   // -------------------------
   // Button collector (no immediate timeout) — staff only check inside handler
   // -------------------------
@@ -237,10 +237,12 @@ client.on("interactionCreate", async (interaction) => {
   } catch (err) {
     console.error("❌ Failed to save fine to JSON:", err);
   }
+    interaction.editReply({ content: `✅ Fine issued successfully! Case logged in <#${moroorChannel.id}>`, ephemeral: true });
 });
 
 client.login(config.token);
-console.log('version 23:19');
+console.log('version 1:22');
+
 
 
 
