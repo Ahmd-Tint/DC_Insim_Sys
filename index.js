@@ -192,7 +192,7 @@ client.on("interactionCreate", async (interaction) => {
         await fs.writeJson(finesFile, fines, { spaces: 2 });
       }
       console.log('========================');
-      console.log(`Case: (${channelName}`);
+      console.log(`Case: ${channelName}`);
       console.log(`Status: Closed`);
       console.log(`Closed by: ${i.member}`);
       console.log('========================');
@@ -251,6 +251,7 @@ client.on("interactionCreate", async (interaction) => {
 
 client.login(config.token);
 console.log('version 1:41');
+
 
 
 
