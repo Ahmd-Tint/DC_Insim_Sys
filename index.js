@@ -23,14 +23,13 @@ keepAlive();
 const { Client, GatewayIntentBits, SlashCommandBuilder, Routes, EmbedBuilder, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
 const { REST } = require("@discordjs/rest");
 const fs = require("fs-extra");
-const config = fs.readJsonSync("./config.json");
 
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
 });
 
-const rest = new REST({ version: "10" }).setToken(config.token);
+const rest = new REST({ version: "10" }).setToken(process.env.token);
 
 const finesFile = "./fines.json";
 
@@ -52,7 +51,7 @@ const commands = [
 
 async function registerCommands() {
   try {
-    await rest.put(Routes.applicationGuildCommands(client.user.id, config.guildId), { body: commands });
+    await rest.put(Routes.applicationGuildCommands(client.user.id, process.env.guildId), { body: commands });
     console.log("✅ Slash commands registered!");
   } catch (err) {
     console.error("❌ Failed to register commands:", err);
@@ -83,7 +82,7 @@ client.on("interactionCreate", async (interaction) => {
   const amount = interaction.options.getInteger("amount");
 
   const member = await interaction.guild.members.fetch(officer.id);
-  if (!member.roles.cache.has(config.copRoleId)) {
+  if (!member.roles.cache.has(process.env.copRoleId)) {
     return interaction.reply({ content: "🚫 You are not authorized to use this command.", ephemeral: true });
   }
 
@@ -123,7 +122,7 @@ client.on("interactionCreate", async (interaction) => {
     type: 0,
     permissionOverwrites: [
       { id: interaction.guild.roles.everyone, deny: [PermissionsBitField.Flags.ViewChannel] },
-      { id: config.staffRoleId, allow: [PermissionsBitField.Flags.ViewChannel] },
+      { id: process.env.staffRoleId, allow: [PermissionsBitField.Flags.ViewChannel] },
       { id: officer.id, allow: [PermissionsBitField.Flags.ViewChannel] },
       { id: finedUser.id, allow: [PermissionsBitField.Flags.ViewChannel] },
     ],
@@ -174,7 +173,7 @@ client.on("interactionCreate", async (interaction) => {
 
   collector.on("collect", async i => {
     // Make sure we have a GuildMember and check staff role
-    if (!i.member || !i.member.roles || !i.member.roles.cache.has(config.staffRoleId)) {
+    if (!i.member || !i.member.roles || !i.member.roles.cache.has(process.env.staffRoleId)) {
       return i.reply({ content: "🚫 You cannot close this case.", ephemeral: true });
     }
 
@@ -208,7 +207,7 @@ client.on("interactionCreate", async (interaction) => {
   });
 
   // Log to staff channel
-  const staffLogChannel = interaction.guild.channels.cache.get(config.logChannelId);
+  const staffLogChannel = interaction.guild.channels.cache.get(process.env.logChannelId);
   if (staffLogChannel) {
     await staffLogChannel.send({
       content: `📝 **Fine Logged**
@@ -249,15 +248,5 @@ client.on("interactionCreate", async (interaction) => {
     interaction.editReply({ content: `✅ Fine issued successfully! Case logged in <#${moroorChannel.id}>`, ephemeral: true });
 });
 
-client.login(config.token);
+client.login(process.env.TOKEN);
 console.log('version 1:41');
-
-
-
-
-
-
-
-
-
-
