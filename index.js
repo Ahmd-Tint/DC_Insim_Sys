@@ -205,7 +205,7 @@ client.on("interactionCreate", async (interaction) => {
   // Log to staff channel
   const staffLogChannel = interaction.guild.channels.cache.get(process.env.logChannelId);
   if (staffLogChannel) {
-    await staffLogChannel.send({
+    staffLogChannel.send({
       content: `📝 **Fine Logged**
 **Officer:** ${officer.tag} (${officer.id})
 **Fined User:** ${finedUser.tag} (${finedUser.id})
@@ -285,5 +285,6 @@ client.on("interactionCreate", async (interaction) => {
 
 client.login(process.env.TOKEN);
 console.log('version 1:41');
+
 
 
