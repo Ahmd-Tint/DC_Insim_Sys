@@ -22,7 +22,6 @@ keepAlive();
 
 const { Client, GatewayIntentBits, SlashCommandBuilder, Routes, EmbedBuilder, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
 const { REST } = require("@discordjs/rest");
-const fs = require("fs-extra");
 
 
 const client = new Client({
@@ -31,12 +30,12 @@ const client = new Client({
 
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
-const finesFile = "./fines.json";
+// const finesFile = "./fines.json";
 
 // Ensure fines.json exists
-if (!fs.existsSync(finesFile)) {
-  fs.writeJsonSync(finesFile, []);
-}
+// if (!fs.existsSync(finesFile)) {
+//  fs.writeJsonSync(finesFile, []);
+// }
 
 const commands = [
   new SlashCommandBuilder()
@@ -169,23 +168,21 @@ client.on("interactionCreate", async (interaction) => {
   // -------------------------
   // Button collector (no immediate timeout) — staff only check inside handler
   // -------------------------
-  const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button });
   
   
-  
-    try {
-      // mark as closed in fines.json (if the fine exists)
-      let fines = [];
-      if (await fs.pathExists(finesFile)) {
-        fines = await fs.readJson(finesFile);
-      }
-      const idx = fines.findIndex(f => f.fineNumber === fineNumber);
-      if (idx !== -1) {
-        fines[idx].status = "closed";
-        fines[idx].closedBy = i.user.tag;
-        fines[idx].closedAt = new Date().toISOString();
-        await fs.writeJson(finesFile, fines, { spaces: 2 });
-      }
+//     try {
+//       // mark as closed in fines.json (if the fine exists)
+//       let fines = [];
+//       if (await fs.pathExists(finesFile)) {
+//         fines = await fs.readJson(finesFile);
+//       }
+//       const idx = fines.findIndex(f => f.fineNumber === fineNumber);
+//       if (idx !== -1) {
+//         fines[idx].status = "closed";
+//         fines[idx].closedBy = i.user.tag;
+//         fines[idx].closedAt = new Date().toISOString();
+//         await fs.writeJson(finesFile, fines, { spaces: 2 });
+//       }
       console.log('========================');
       console.log(`Case: ${channelName}`);
       console.log(`Status: Closed`);
@@ -195,7 +192,6 @@ client.on("interactionCreate", async (interaction) => {
 
       // small delay so the ephemeral reply is delivered before channel delete
       setTimeout(() => moroorChannel.delete().catch(() => {}), 3000);
-      collector.stop();
     } catch (err) {
       console.error("Error closing case:", err);
       try { await i.reply({ content: "❌ Error while closing case.", ephemeral: true }); } catch {}
@@ -218,30 +214,30 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   // Save to JSON safely
-  try {
-    let fines = [];
-    if (await fs.pathExists(finesFile)) {
-      fines = await fs.readJson(finesFile);
-    }
-    fines.push({
-      fineNumber,
-      officer: officer.tag,
-      officerId: officer.id,
-      finedUser: finedUser.tag,
-      finedUserId: finedUser.id,
-      reason,
-      city,
-      plate,
-      amount,
-      date: dateStr,
-      time: timeStr,
-      status: "open"
-    });
-    await fs.writeJson(finesFile, fines, { spaces: 2 });
-  } catch (err) {
-    console.error("❌ Failed to save fine to JSON:", err);
-  }
-    interaction.editReply({ content: `✅ Fine issued successfully! Case logged in <#${moroorChannel.id}>`, ephemeral: true });
+//   try {
+//     let fines = [];
+//     if (await fs.pathExists(finesFile)) {
+//       fines = await fs.readJson(finesFile);
+//     }
+//     fines.push({
+//       fineNumber,
+//       officer: officer.tag,
+//       officerId: officer.id,
+//       finedUser: finedUser.tag,
+//       finedUserId: finedUser.id,
+//       reason,
+//       city,
+//       plate,
+//       amount,
+//       date: dateStr,
+//       time: timeStr,
+//       status: "open"
+//     });
+//    await fs.writeJson(finesFile, fines, { spaces: 2 });
+//   } catch (err) {
+//    console.error("❌ Failed to save fine to JSON:", err);
+//   }
+//     interaction.editReply({ content: `✅ Fine issued successfully! Case logged in <#${moroorChannel.id}>`, ephemeral: true });
 });
 
 // GLOBAL handler for the Close Case button (works after restart)
@@ -285,6 +281,7 @@ client.on("interactionCreate", async (interaction) => {
 
 client.login(process.env.TOKEN);
 console.log('version 1:41');
+
 
 
 
