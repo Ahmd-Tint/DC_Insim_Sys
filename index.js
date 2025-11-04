@@ -170,13 +170,9 @@ client.on("interactionCreate", async (interaction) => {
   // Button collector (no immediate timeout) — staff only check inside handler
   // -------------------------
   const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button });
-
-  collector.on("collect", async i => {
-    // Make sure we have a GuildMember and check staff role
-    if (!i.member || !i.member.roles || !i.member.roles.cache.has(process.env.staffRoleId)) {
-      return i.reply({ content: "🚫 You cannot close this case.", ephemeral: true });
-    }
-
+  
+  
+  
     try {
       // mark as closed in fines.json (if the fine exists)
       let fines = [];
@@ -248,6 +244,46 @@ client.on("interactionCreate", async (interaction) => {
     interaction.editReply({ content: `✅ Fine issued successfully! Case logged in <#${moroorChannel.id}>`, ephemeral: true });
 });
 
+// GLOBAL handler for the Close Case button (works after restart)
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isButton()) return;
+  if (interaction.customId !== "close_fine") return;
+
+  if (!interaction.member?.roles?.cache.has(process.env.staffRoleId)) {
+    return interaction.reply({ content: "🚫 You cannot close this case.", ephemeral: true });
+  }
+
+  const moroorChannel = interaction.channel;
+
+  try {
+    const messages = await moroorChannel.messages.fetch({ limit: 1 });
+    const caseMsg = messages.first();
+    const embed = caseMsg?.embeds[0];
+    const fineNumberMatch = embed?.description?.match(/Fine Number:\n__([0-9]+)__/);
+    const fineNumber = fineNumberMatch ? fineNumberMatch[1] : null;
+
+    let fines = [];
+    if (await fs.pathExists(finesFile)) fines = await fs.readJson(finesFile);
+
+    const idx = fines.findIndex(f => f.fineNumber == fineNumber);
+    if (idx !== -1) {
+      fines[idx].status = "closed";
+      fines[idx].closedBy = interaction.user.tag;
+      fines[idx].closedAt = new Date().toISOString();
+      await fs.writeJson(finesFile, fines, { spaces: 2 });
+    }
+
+    await interaction.reply({ content: "✅ Case closed and channel will be deleted.", ephemeral: true });
+    console.log(`✅ Case closed: ${moroorChannel.name} by ${interaction.user.tag}`);
+
+    setTimeout(() => moroorChannel.delete().catch(() => {}), 3000);
+  } catch (err) {
+    console.error("❌ Error closing case:", err);
+    try { await interaction.reply({ content: "❌ Error while closing case.", ephemeral: true }); } catch {}
+  }
+});
+
 client.login(process.env.TOKEN);
 console.log('version 1:41');
+
 
