@@ -222,23 +222,6 @@ client.on("interactionCreate", async (interaction) => {
 
   const moroorChannel = interaction.channel;
 
-  try {
-    const messages = await moroorChannel.messages.fetch({ limit: 1 });
-    const caseMsg = messages.first();
-    const embed = caseMsg?.embeds[0];
-    const fineNumberMatch = embed?.description?.match(/Fine Number:\n__([0-9]+)__/);
-    const fineNumber = fineNumberMatch ? fineNumberMatch[1] : null;
-
-    let fines = [];
-    if (await fs.pathExists(finesFile)) fines = await fs.readJson(finesFile);
-
-    const idx = fines.findIndex(f => f.fineNumber == fineNumber);
-    if (idx !== -1) {
-      fines[idx].status = "closed";
-      fines[idx].closedBy = interaction.user.tag;
-      fines[idx].closedAt = new Date().toISOString();
-      await fs.writeJson(finesFile, fines, { spaces: 2 });
-    }
 
     interaction.reply({ content: "✅ Case closed and channel will be deleted.", ephemeral: true });
     console.log(`✅ Case closed: ${moroorChannel.name} by ${interaction.user.tag}`);
@@ -251,6 +234,7 @@ client.on("interactionCreate", async (interaction) => {
 
 client.login(process.env.TOKEN);
 console.log('version 1:41');
+
 
 
 
