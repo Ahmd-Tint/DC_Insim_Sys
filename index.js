@@ -169,35 +169,6 @@ client.on("interactionCreate", async (interaction) => {
   // Button collector (no immediate timeout) — staff only check inside handler
   // -------------------------
   
-  
-//     try {
-//       // mark as closed in fines.json (if the fine exists)
-//       let fines = [];
-//       if (await fs.pathExists(finesFile)) {
-//         fines = await fs.readJson(finesFile);
-//       }
-//       const idx = fines.findIndex(f => f.fineNumber === fineNumber);
-//       if (idx !== -1) {
-//         fines[idx].status = "closed";
-//         fines[idx].closedBy = i.user.tag;
-//         fines[idx].closedAt = new Date().toISOString();
-//         await fs.writeJson(finesFile, fines, { spaces: 2 });
-//       }
-      console.log('========================');
-      console.log(`Case: ${channelName}`);
-      console.log(`Status: Closed`);
-      console.log(`Closed by: ${i.member}`);
-      console.log('========================');
-      await i.reply({ content: "✅ Case closed and channel will be deleted.", ephemeral: true });
-
-      // small delay so the ephemeral reply is delivered before channel delete
-      setTimeout(() => moroorChannel.delete().catch(() => {}), 3000);
-    } catch (err) {
-      console.error("Error closing case:", err);
-      try { await i.reply({ content: "❌ Error while closing case.", ephemeral: true }); } catch {}
-    }
-  });
-
   // Log to staff channel
   const staffLogChannel = interaction.guild.channels.cache.get(process.env.logChannelId);
   if (staffLogChannel) {
@@ -269,9 +240,8 @@ client.on("interactionCreate", async (interaction) => {
       await fs.writeJson(finesFile, fines, { spaces: 2 });
     }
 
-    await interaction.reply({ content: "✅ Case closed and channel will be deleted.", ephemeral: true });
+    interaction.reply({ content: "✅ Case closed and channel will be deleted.", ephemeral: true });
     console.log(`✅ Case closed: ${moroorChannel.name} by ${interaction.user.tag}`);
-
     setTimeout(() => moroorChannel.delete().catch(() => {}), 3000);
   } catch (err) {
     console.error("❌ Error closing case:", err);
@@ -281,6 +251,7 @@ client.on("interactionCreate", async (interaction) => {
 
 client.login(process.env.TOKEN);
 console.log('version 1:41');
+
 
 
 
