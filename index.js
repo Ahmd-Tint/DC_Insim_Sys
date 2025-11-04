@@ -222,8 +222,8 @@ client.on("interactionCreate", async (interaction) => {
 
   const moroorChannel = interaction.channel;
 
-
-    interaction.reply({ content: "✅ Case closed and channel will be deleted.", ephemeral: true });
+  try {
+    await interaction.reply({ content: "✅ Case closed and channel will be deleted.", ephemeral: true });
     console.log(`✅ Case closed: ${moroorChannel.name} by ${interaction.user.tag}`);
     setTimeout(() => moroorChannel.delete().catch(() => {}), 3000);
   } catch (err) {
@@ -232,8 +232,10 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
+
 client.login(process.env.TOKEN);
-console.log('version 1:41');
+console.log('Version 5:13:33 PM, Tue, Nov 4, 2025');
+
 
 
 
