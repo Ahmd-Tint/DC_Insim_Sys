@@ -25,10 +25,18 @@ const { REST } = require("@discordjs/rest");
 
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+  partials: [Partials.Channel],
 });
 
+
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
+
+
 
 // const finesFile = "./fines.json";
 
@@ -36,6 +44,8 @@ const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 // if (!fs.existsSync(finesFile)) {
 //  fs.writeJsonSync(finesFile, []);
 // }
+
+
 
 const commands = [
   new SlashCommandBuilder()
@@ -235,14 +245,6 @@ client.on("interactionCreate", async (interaction) => {
 
 // CALL 911
 
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-  ],
-  partials: [Partials.Channel],
-});
 
 const LOG_CHANNEL_ID = "1423428971311271976"; // Logs go here
 
@@ -371,6 +373,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 client.login(process.env.TOKEN);
 console.log('Version 12:21 PM, Thu, Nov 6, 2025');
+
 
 
 
