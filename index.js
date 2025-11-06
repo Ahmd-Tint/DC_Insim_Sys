@@ -20,7 +20,21 @@ function keepAlive() {
 
 keepAlive();
 
-const { Client, GatewayIntentBits, SlashCommandBuilder, Routes, EmbedBuilder, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Partials } = require("discord.js");
+const {
+  Client,
+  GatewayIntentBits,
+  Partials,
+  SlashCommandBuilder,
+  Routes,
+  EmbedBuilder,
+  PermissionsBitField,
+  ChannelType,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  Events
+} = require("discord.js");
 const { REST } = require("@discordjs/rest");
 
 
@@ -373,6 +387,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 client.login(process.env.TOKEN);
 console.log('Version 12:21 PM, Thu, Nov 6, 2025');
+
 
 
 
