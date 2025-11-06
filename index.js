@@ -233,8 +233,145 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 
+// CALL 911
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+  partials: [Partials.Channel],
+});
+
+const LOG_CHANNEL_ID = "1423428971311271976"; // Logs go here
+
+client.once(Events.ClientReady, () => {
+  console.log(`✅ Logged in as ${client.user.tag}.` + ` ` + `Reached 911 CALL side`);
+});
+
+client.on(Events.MessageCreate, async (message) => {
+  if (message.author.bot) return;
+
+  if (message.content.toLowerCase() === "!call 911") {
+    const guild = message.guild;
+    const caller = message.member;
+    const callerId = caller.id;
+
+    // Prevent multiple calls from same user
+    const existingChannel = guild.channels.cache.find(
+      (ch) => ch.name === callerId
+    );
+    if (existingChannel) {
+      return message.reply("🚫 You already have an active call channel.");
+    }
+
+    // Find roles
+    const teamRole = guild.roles.cache.find((r) => r.name === "[RL] Team");
+    const copRole = guild.roles.cache.find((r) => r.name === "COP License");
+
+    // Create the private channel
+    const callChannel = await guild.channels.create({
+      name: callerId,
+      type: ChannelType.GuildText,
+      permissionOverwrites: [
+        { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+        {
+          id: callerId,
+          allow: [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages,
+          ],
+        },
+        ...(teamRole
+          ? [
+              {
+                id: teamRole.id,
+                allow: [
+                  PermissionsBitField.Flags.ViewChannel,
+                  PermissionsBitField.Flags.SendMessages,
+                ],
+              },
+            ]
+          : []),
+        ...(copRole
+          ? [
+              {
+                id: copRole.id,
+                allow: [
+                  PermissionsBitField.Flags.ViewChannel,
+                  PermissionsBitField.Flags.SendMessages,
+                ],
+              },
+            ]
+          : []),
+      ],
+    });
+
+    // Send initial message
+    await callChannel.send("📞 Calling 911...");
+
+    // Log call creation
+    const logChannel = guild.channels.cache.get(LOG_CHANNEL_ID);
+    if (logChannel) {
+      logChannel.send(
+        `📞 **911 Call Started** by <@${callerId}> | Channel: <#${callChannel.id}>`
+      );
+    }
+
+    // After 10 seconds
+    setTimeout(async () => {
+      const messages = await callChannel.messages.fetch({ limit: 1 });
+      const firstMsg = messages.first();
+      if (firstMsg) await firstMsg.edit("🚨 911");
+
+      // Send response + End Call button
+      const endButton = new ButtonBuilder()
+        .setCustomId("end_call")
+        .setLabel("End Call")
+        .setStyle(ButtonStyle.Danger);
+
+      const row = new ActionRowBuilder().addComponents(endButton);
+
+      await callChannel.send({
+        content: `${caller}, 911 — how can I help you?`,
+        components: [row],
+      });
+    }, 10000);
+  }
+});
+
+// Handle End Call button
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isButton()) return;
+
+  if (interaction.customId === "end_call") {
+    await interaction.reply({
+      content: "📞 Call ending in 3 seconds...",
+      ephemeral: true,
+    });
+
+    // Log before closing
+    const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
+    if (logChannel) {
+      logChannel.send(
+        `🔚 **911 Call Ended** | Call by: <@${interaction.channel.name}> | Closed by: <@${interaction.user.id}>`
+      );
+    }
+
+    setTimeout(() => {
+      interaction.channel.delete().catch(() => {});
+    }, 3000);
+  }
+});
+
+
+// END OF CALL 911
+
+
 client.login(process.env.TOKEN);
-console.log('Version 5:13:33 PM, Tue, Nov 4, 2025');
+console.log('Version 12:21 PM, Thu, Nov 6, 2025');
+
 
 
 
