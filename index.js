@@ -232,7 +232,7 @@ client.on("interactionCreate", async (interaction) => {
 //   } catch (err) {
 //    console.error("❌ Failed to save fine to JSON:", err);
 //   }
-//     interaction.editReply({ content: `✅ Fine issued successfully! Case logged in <#${moroorChannel.id}>`, ephemeral: true });
+     interaction.editReply({ content: `✅ Fine issued successfully! Case logged in <#${moroorChannel.id}>`, ephemeral: true });
 });
 
 // GLOBAL handler for the Close Case button (works after restart)
@@ -387,6 +387,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 client.login(process.env.TOKEN);
 console.log('Version 12:21 PM, Thu, Nov 6, 2025');
+
 
 
 
