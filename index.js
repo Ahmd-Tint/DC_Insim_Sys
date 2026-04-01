@@ -32,11 +32,9 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ComponentType,
   Events
 } = require("discord.js");
 const { REST } = require("@discordjs/rest");
-
 
 const client = new Client({
   intents: [
@@ -47,20 +45,9 @@ const client = new Client({
   partials: [Partials.Channel],
 });
 
-
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
-
-
-// const finesFile = "./fines.json";
-
-// Ensure fines.json exists
-// if (!fs.existsSync(finesFile)) {
-//  fs.writeJsonSync(finesFile, []);
-// }
-
-
-
+// ===== COMMAND REGISTRATION =====
 const commands = [
   new SlashCommandBuilder()
     .setName("fine")
@@ -69,7 +56,18 @@ const commands = [
     .addStringOption(opt => opt.setName("reason").setDescription("What's the reason for the fine?").setRequired(true))
     .addStringOption(opt => opt.setName("city").setDescription("Fined in which map?").setRequired(true))
     .addStringOption(opt => opt.setName("vehicle").setDescription("What's the plate of the car?").setRequired(true))
-    .addIntegerOption(opt => opt.setName("amount").setDescription("Fine amount").setRequired(true))
+    .addIntegerOption(opt => opt.setName("amount").setDescription("Fine amount").setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName("stop")
+    .setDescription("Start a traffic stop (LFS)")
+    .addUserOption(opt => opt.setName("suspect").setDescription("The person you are stopping").setRequired(true))
+    .addStringOption(opt => opt.setName("channel_name").setDescription("Name for the channel").setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName("add_to_stop")
+    .setDescription("Add another person to this traffic stop")
+    .addUserOption(opt => opt.setName("user").setDescription("User to add").setRequired(true))
 ].map(cmd => cmd.toJSON());
 
 async function registerCommands() {
@@ -86,316 +84,173 @@ client.once("ready", async () => {
   await registerCommands();
 });
 
+// ===== INTERACTION HANDLER =====
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
-  if (interaction.commandName !== "fine") return;
 
-  
-  await interaction.deferReply({ ephemeral: true });
+  const member = await interaction.guild.members.fetch(interaction.user.id);
+  const isCop = member.roles.cache.has(process.env.copRoleId);
 
-  
-  await interaction.editReply(`<a:2366_Loading_Pixels:1427600726691156100> Loading...\nPlease be patient`);
+  // --- STOP COMMAND ---
+  if (interaction.commandName === "stop") {
+    if (!isCop) return interaction.reply({ content: "🚫 Only Officers with a COP License can use this.", ephemeral: true });
 
-  
-  const officer = interaction.user;
-  const finedUser = interaction.options.getUser("user");
-  const reason = interaction.options.getString("reason");
-  const city = interaction.options.getString("city");
-  const plate = interaction.options.getString("vehicle");
-  const amount = interaction.options.getInteger("amount");
+    const suspect = interaction.options.getUser("suspect");
+    const channelNameInput = interaction.options.getString("channel_name");
 
-  const member = await interaction.guild.members.fetch(officer.id);
-  if (!member.roles.cache.has(process.env.copRoleId)) {
-    return interaction.reply({ content: "🚫 You are not authorized to use this command.", ephemeral: true });
-  }
-
-  // Fine number and timestamps
-  const fineNumber = Math.floor(1000000000 + Math.random() * 9000000000);
-  const now = new Date();
-  const dateStr = now.toISOString().split("T")[0]; // 2025-10-05
-  const timeStr = now.toTimeString().slice(0,5);   // 13:21
-  const dateUnderline = `__${dateStr}__`;
-  const timeUnderline = `__${timeStr}__`;
-
-  // -------------------------
-  // Create a new channel named after the fined user's ID.
-  // If channels for this ID already exist, append -2, -3, etc.
-  // -------------------------
-  const baseName = finedUser.id;
-  const existing = interaction.guild.channels.cache.filter(ch => ch.name && (ch.name === baseName || ch.name.startsWith(`${baseName}-`)));
-
-  // determine next available suffix (base, base-2, base-3, ...)
-  let channelName = baseName;
-  if (existing.size > 0) {
-    let max = 1;
-    existing.forEach(ch => {
-      const m = ch.name.match(new RegExp(`^${baseName}-(\\d+)$`));
-      if (m) {
-        const n = parseInt(m[1], 10);
-        if (n >= max) max = n + 1;
-      } else if (ch.name === baseName) {
-        if (max < 2) max = 2;
-      }
-    });
-    channelName = `${baseName}-${max}`;
-  }
-
-  const moroorChannel = await interaction.guild.channels.create({
-    name: channelName,
-    type: 0,
-    permissionOverwrites: [
-      { id: interaction.guild.roles.everyone, deny: [PermissionsBitField.Flags.ViewChannel] },
-      { id: process.env.staffRoleId, allow: [PermissionsBitField.Flags.ViewChannel] },
-      { id: officer.id, allow: [PermissionsBitField.Flags.ViewChannel] },
-      { id: finedUser.id, allow: [PermissionsBitField.Flags.ViewChannel] },
-    ],
-  });
-
-  // -------------------------
-  // EMBED: left exactly as you originally wrote it
-  // -------------------------
-  const embed = new EmbedBuilder()
-    .setColor("Grey")
-    .setDescription(
-      `Violation recorded:\n` +
-      `${reason}\n` +
-      `Fine Number:\n__${fineNumber}__\n` +
-      `ID:\n${finedUser.id}\n` +
-      `Date:\n${dateUnderline}\n` +
-      `Time:\n${timeUnderline}\n` +
-      `City:\n${city}\n` +
-      `On vehicle:\n${plate}\n` +
-      `Amount: ${amount}`
-    )
-    .setFooter({ text: `You can pay this fine by typing !pay ${officer.tag} ${amount}` })
-    .setTimestamp();
-
-  // Close button (staff only)
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId("close_fine")
-      .setLabel("Close Case")
-      .setStyle(ButtonStyle.Danger)
-  );
-  console.log(`================================================`);
-  console.log(`${officer.tag}`);
-  console.log(`${reason}`);
-  console.log(`${fineNumber}`);
-  console.log(`${finedUser.id}`);
-  console.log(`${dateUnderline}`);
-  console.log(`${timeUnderline}`);
-  console.log(`${city}`);
-  console.log(`${plate}`);
-  console.log(`${amount}`);
-  console.log(`================================================`);
-  const msg = await moroorChannel.send({ content: `<@${finedUser.id}>`, embeds: [embed], components: [row] });
-  // -------------------------
-  // Button collector (no immediate timeout) — staff only check inside handler
-  // -------------------------
-  
-  // Log to staff channel
-  const staffLogChannel = interaction.guild.channels.cache.get(process.env.logChannelId);
-  if (staffLogChannel) {
-    staffLogChannel.send({
-      content: `📝 **Fine Logged**
-**Officer:** ${officer.tag} (${officer.id})
-**Fined User:** ${finedUser.tag} (${finedUser.id})
-**Reason:** ${reason}
-**City:** ${city}
-**Plate:** ${plate}
-**Amount:** ${amount}
-**Fine Number:** ${fineNumber}`
-    });
-  }
-
-  // Save to JSON safely
-//   try {
-//     let fines = [];
-//     if (await fs.pathExists(finesFile)) {
-//       fines = await fs.readJson(finesFile);
-//     }
-//     fines.push({
-//       fineNumber,
-//       officer: officer.tag,
-//       officerId: officer.id,
-//       finedUser: finedUser.tag,
-//       finedUserId: finedUser.id,
-//       reason,
-//       city,
-//       plate,
-//       amount,
-//       date: dateStr,
-//       time: timeStr,
-//       status: "open"
-//     });
-//    await fs.writeJson(finesFile, fines, { spaces: 2 });
-//   } catch (err) {
-//    console.error("❌ Failed to save fine to JSON:", err);
-//   }
-     interaction.editReply({ content: `✅ Fine issued successfully! Case logged in <#${moroorChannel.id}>`, ephemeral: true });
-});
-
-// GLOBAL handler for the Close Case button (works after restart)
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isButton()) return;
-  if (interaction.customId !== "close_fine") return;
-
-  if (!interaction.member?.roles?.cache.has(process.env.staffRoleId)) {
-    return interaction.reply({ content: "🚫 You cannot close this case.", ephemeral: true });
-  }
-
-  const moroorChannel = interaction.channel;
-
-  try {
-    await interaction.reply({ content: "✅ Case closed and channel will be deleted.", ephemeral: true });
-    console.log(`✅ Case closed: ${moroorChannel.name} by ${interaction.user.tag}`);
-    setTimeout(() => moroorChannel.delete().catch(() => {}), 3000);
-  } catch (err) {
-    console.error("❌ Error closing case:", err);
-    try { await interaction.reply({ content: "❌ Error while closing case.", ephemeral: true }); } catch {}
-  }
-});
-
-
-// CALL 911
-
-
-const LOG_CHANNEL_ID = "1423428971311271976"; // Logs go here
-
-client.once(Events.ClientReady, () => {
-  console.log(`✅ Logged in as ${client.user.tag}.` + ` ` + `Reached 911 CALL side`);
-});
-
-client.on(Events.MessageCreate, async (message) => {
-  if (message.author.bot) return;
-
-  if (message.content.toLowerCase() === "!call 911") {
-    const guild = message.guild;
-    const caller = message.member;
-    const callerId = caller.id;
-
-    // Prevent multiple calls from same user
-    const existingChannel = guild.channels.cache.find(
-      (ch) => ch.name === callerId
-    );
-    if (existingChannel) {
-      return message.reply("🚫 You already have an active call channel.");
+    if (suspect.id === interaction.user.id) {
+      return interaction.reply({ content: "❌ You cannot stop yourself!", ephemeral: true });
     }
 
-    // Find roles
-    const teamRole = guild.roles.cache.find((r) => r.name === "[RL] Team");
-    const copRole = guild.roles.cache.find((r) => r.name === "COP License");
+    try {
+      const stopChannel = await interaction.guild.channels.create({
+        name: `stop-${channelNameInput}`,
+        type: ChannelType.GuildText,
+        parent: process.env.STOP_CATEGORY_ID || null,
+        permissionOverwrites: [
+          { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+          { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+          { id: suspect.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+          { id: process.env.staffRoleId, allow: [PermissionsBitField.Flags.ViewChannel] }
+        ],
+      });
 
-    // Create the private channel
-    const callChannel = await guild.channels.create({
-      name: callerId,
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId("release_suspect")
+          .setLabel("Release Suspect")
+          .setStyle(ButtonStyle.Success)
+      );
+
+      await stopChannel.send({
+        content: `🚨 **Traffic Stop Initiated**\nOfficer: <@${interaction.user.id}>\nSuspect: <@${suspect.id}>\n\nPlease cooperate with the officer.`,
+        components: [row]
+      });
+
+      await interaction.reply({ content: `✅ Stop channel created: <#${stopChannel.id}>`, ephemeral: true });
+    } catch (err) {
+      console.error(err);
+      interaction.reply({ content: "❌ Error creating channel. Check Category ID and permissions.", ephemeral: true });
+    }
+  }
+
+  // --- ADD TO STOP COMMAND ---
+  if (interaction.commandName === "add_to_stop") {
+    if (!isCop) return interaction.reply({ content: "🚫 Authorized personnel only.", ephemeral: true });
+    if (!interaction.channel.name.startsWith("stop-")) {
+      return interaction.reply({ content: "❌ This can only be used in a Stop channel.", ephemeral: true });
+    }
+
+    const userToAdd = interaction.options.getUser("user");
+    await interaction.channel.permissionOverwrites.edit(userToAdd.id, {
+      ViewChannel: true,
+      SendMessages: true,
+      ReadMessageHistory: true
+    });
+
+    await interaction.channel.send(`➕ <@${userToAdd.id}> has been added to the scene by <@${interaction.user.id}>.`);
+    await interaction.reply({ content: `✅ Added ${userToAdd.tag}`, ephemeral: true });
+  }
+
+  // --- FINE COMMAND (Original Logic) ---
+  if (interaction.commandName === "fine") {
+    if (!isCop) return interaction.reply({ content: "🚫 Unauthorized.", ephemeral: true });
+    
+    await interaction.deferReply({ ephemeral: true });
+    await interaction.editReply(`<a:2366_Loading_Pixels:1427600726691156100> Loading...`);
+
+    const officer = interaction.user;
+    const finedUser = interaction.options.getUser("user");
+    const reason = interaction.options.getString("reason");
+    const city = interaction.options.getString("city");
+    const plate = interaction.options.getString("vehicle");
+    const amount = interaction.options.getInteger("amount");
+
+    const fineNumber = Math.floor(1000000000 + Math.random() * 9000000000);
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0];
+    const timeStr = now.toTimeString().slice(0, 5);
+
+    const moroorChannel = await interaction.guild.channels.create({
+      name: `${finedUser.id}-fine`,
       type: ChannelType.GuildText,
       permissionOverwrites: [
-        { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-        {
-          id: callerId,
-          allow: [
-            PermissionsBitField.Flags.ViewChannel,
-            PermissionsBitField.Flags.SendMessages,
-          ],
-        },
-        ...(teamRole
-          ? [
-              {
-                id: teamRole.id,
-                allow: [
-                  PermissionsBitField.Flags.ViewChannel,
-                  PermissionsBitField.Flags.SendMessages,
-                ],
-              },
-            ]
-          : []),
-        ...(copRole
-          ? [
-              {
-                id: copRole.id,
-                allow: [
-                  PermissionsBitField.Flags.ViewChannel,
-                  PermissionsBitField.Flags.SendMessages,
-                ],
-              },
-            ]
-          : []),
+        { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+        { id: officer.id, allow: [PermissionsBitField.Flags.ViewChannel] },
+        { id: finedUser.id, allow: [PermissionsBitField.Flags.ViewChannel] },
+        { id: process.env.staffRoleId, allow: [PermissionsBitField.Flags.ViewChannel] }
       ],
     });
 
-    // Send initial message
-    await callChannel.send("📞 Calling 911...");
+    const embed = new EmbedBuilder()
+      .setColor("Grey")
+      .setDescription(`Violation recorded:\n${reason}\nFine Number:\n__${fineNumber}__\nID:\n${finedUser.id}\nDate:\n__${dateStr}__\nTime:\n__${timeStr}__\nCity:\n${city}\nOn vehicle:\n${plate}\nAmount: ${amount}`)
+      .setFooter({ text: `Pay via: !pay ${officer.tag} ${amount}` })
+      .setTimestamp();
 
-    // Log call creation
-    const logChannel = guild.channels.cache.get(LOG_CHANNEL_ID);
-    if (logChannel) {
-      logChannel.send(
-        `📞 **911 Call Started** by <@${callerId}> | Channel: <#${callChannel.id}>`
-      );
-    }
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("close_fine").setLabel("Close Case").setStyle(ButtonStyle.Danger)
+    );
 
-    // After 10 seconds
-    setTimeout(async () => {
-      const messages = await callChannel.messages.fetch({ limit: 1 });
-      const firstMsg = messages.first();
-      if (firstMsg) await firstMsg.edit("🚨 911");
-
-      // Send response + End Call button
-      const endButton = new ButtonBuilder()
-        .setCustomId("end_call")
-        .setLabel("End Call")
-        .setStyle(ButtonStyle.Danger);
-
-      const row = new ActionRowBuilder().addComponents(endButton);
-
-      await callChannel.send({
-        content: `${caller}, 911 — how can I help you?`,
-        components: [row],
-      });
-    }, 10000);
+    await moroorChannel.send({ content: `<@${finedUser.id}>`, embeds: [embed], components: [row] });
+    interaction.editReply({ content: `✅ Fine issued: <#${moroorChannel.id}>` });
   }
 });
 
-// Handle End Call button
-client.on(Events.InteractionCreate, async (interaction) => {
+// ===== BUTTON HANDLER =====
+client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
 
+  const member = await interaction.guild.members.fetch(interaction.user.id);
+  const isCop = member.roles.cache.has(process.env.copRoleId);
+  const isStaff = member.roles.cache.has(process.env.staffRoleId);
+
+  if (interaction.customId === "close_fine") {
+    if (!isStaff) return interaction.reply({ content: "🚫 Staff only.", ephemeral: true });
+    await interaction.reply({ content: "✅ Closing channel...", ephemeral: true });
+    setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
+  }
+
+  if (interaction.customId === "release_suspect") {
+    if (!isCop) return interaction.reply({ content: "🚫 Only an Officer can release the suspect.", ephemeral: true });
+    await interaction.reply({ content: "✅ Suspect released. Closing channel..." });
+    setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
+  }
+
   if (interaction.customId === "end_call") {
-    await interaction.reply({
-      content: "📞 Call ending in 3 seconds...",
-      ephemeral: true,
-    });
-
-    // Log before closing
-    const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
-    if (logChannel) {
-      logChannel.send(
-        `🔚 **911 Call Ended** | Call by: <@${interaction.channel.name}> | Closed by: <@${interaction.user.id}>`
-      );
-    }
-
-    setTimeout(() => {
-      interaction.channel.delete().catch(() => {});
-    }, 3000);
+    await interaction.reply({ content: "📞 Ending call...", ephemeral: true });
+    setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
   }
 });
 
+// ===== 911 CALL SYSTEM (Original Logic) =====
+const LOG_CHANNEL_ID = "1423428971311271976";
+client.on(Events.MessageCreate, async (message) => {
+  if (message.author.bot || message.content.toLowerCase() !== "!call 911") return;
 
-// END OF CALL 911
+  const callerId = message.author.id;
+  const existing = message.guild.channels.cache.find(ch => ch.name === callerId);
+  if (existing) return message.reply("🚫 Active call exists.");
 
+  const callChannel = await message.guild.channels.create({
+    name: callerId,
+    type: ChannelType.GuildText,
+    permissionOverwrites: [
+      { id: message.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+      { id: callerId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
+    ],
+  });
+
+  await callChannel.send("📞 Calling 911...");
+  const log = message.guild.channels.cache.get(LOG_CHANNEL_ID);
+  if (log) log.send(`📞 **911 Call** by <@${callerId}> | <#${callChannel.id}>`);
+
+  setTimeout(async () => {
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("end_call").setLabel("End Call").setStyle(ButtonStyle.Danger)
+    );
+    await callChannel.send({ content: `<@${callerId}>, 911 — how can I help you?`, components: [row] });
+  }, 10000);
+});
 
 client.login(process.env.TOKEN);
-console.log('Version 12:21 PM, Thu, Nov 6, 2025');
-
-
-
-
-
-
-
-
-
-
-
-
