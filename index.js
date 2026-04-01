@@ -32,16 +32,20 @@ function keepAlive() {
 keepAlive();
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+  intents: [
+    GatewayIntentBits.Guilds, 
+    GatewayIntentBits.GuildMessages, 
+    GatewayIntentBits.MessageContent
+  ],
   partials: [Partials.Channel],
 });
 
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
-// Temporary memory to track stop data for logs
+// Memory to track stop metadata for the transcript
 const activeStops = new Map();
 
-// ===== COMMAND REGISTRATION =====
+// ===== COMMANDS =====
 const commands = [
   new SlashCommandBuilder()
     .setName("fine")
@@ -76,7 +80,7 @@ client.once("ready", async () => {
   await registerCommands();
 });
 
-// ===== INTERACTION HANDLER =====
+// ===== MAIN HANDLER =====
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -86,16 +90,22 @@ client.on("interactionCreate", async (interaction) => {
   // --- STOP COMMAND ---
   if (interaction.commandName === "stop") {
     if (!isCop) return interaction.reply({ content: "🚫 Only Officers can use this.", ephemeral: true });
+    
     const suspect = interaction.options.getUser("suspect");
     const channelNameInput = interaction.options.getString("channel_name");
 
-    if (suspect.id === interaction.user.id) return interaction.reply({ content: "❌ You cannot stop yourself!", ephemeral: true });
+    if (suspect.id === interaction.user.id) {
+      return interaction.reply({ content: "❌ You cannot stop yourself!", ephemeral: true });
+    }
 
     try {
+      // Force parent ID to be a string and check if it exists
+      const categoryId = process.env.STOP_CATEGORY_ID ? String(process.env.STOP_CATEGORY_ID).trim() : null;
+
       const stopChannel = await interaction.guild.channels.create({
         name: `stop-${channelNameInput}`,
         type: ChannelType.GuildText,
-        parent: process.env.STOP_CATEGORY_ID || null,
+        parent: categoryId, 
         permissionOverwrites: [
           { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
           { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
@@ -104,7 +114,6 @@ client.on("interactionCreate", async (interaction) => {
         ],
       });
 
-      // Save metadata for logs
       activeStops.set(stopChannel.id, {
         officer: interaction.user,
         suspect: suspect,
@@ -113,7 +122,7 @@ client.on("interactionCreate", async (interaction) => {
       });
 
       const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("release_suspect").setLabel("Release Suspect").setStyle(ButtonStyle.Success)
+        new ButtonBuilder().setCustomId("release_suspect").setLabel("Release Suspect & Log").setStyle(ButtonStyle.Success)
       );
 
       await stopChannel.send({
@@ -121,16 +130,19 @@ client.on("interactionCreate", async (interaction) => {
         components: [row]
       });
 
-      await interaction.reply({ content: `✅ Stop channel created: <#${stopChannel.id}>`, ephemeral: true });
+      await interaction.reply({ content: `✅ Stop channel created in category: <#${stopChannel.id}>`, ephemeral: true });
     } catch (err) {
-      interaction.reply({ content: "❌ Error creating channel.", ephemeral: true });
+      console.error(err);
+      interaction.reply({ content: "❌ Error creating channel. Verify `STOP_CATEGORY_ID` in .env is correct.", ephemeral: true });
     }
   }
 
   // --- ADD TO STOP COMMAND ---
   if (interaction.commandName === "add_to_stop") {
     if (!isCop) return interaction.reply({ content: "🚫 Authorized personnel only.", ephemeral: true });
-    if (!interaction.channel.name.startsWith("stop-")) return interaction.reply({ content: "❌ Use in a Stop channel.", ephemeral: true });
+    if (!interaction.channel.name.startsWith("stop-")) {
+      return interaction.reply({ content: "❌ This command is for Traffic Stop channels only.", ephemeral: true });
+    }
 
     const userToAdd = interaction.options.getUser("user");
     await interaction.channel.permissionOverwrites.edit(userToAdd.id, {
@@ -139,19 +151,19 @@ client.on("interactionCreate", async (interaction) => {
       ReadMessageHistory: true
     });
 
-    // Update log metadata
     const stopData = activeStops.get(interaction.channel.id);
     if (stopData && !stopData.addedUsers.includes(userToAdd.tag)) {
         stopData.addedUsers.push(userToAdd.tag);
     }
 
-    await interaction.channel.send(`➕ <@${userToAdd.id}> added by <@${interaction.user.id}>.`);
+    await interaction.channel.send(`➕ <@${userToAdd.id}> has been added to the stop by <@${interaction.user.id}>.`);
     await interaction.reply({ content: `✅ Added ${userToAdd.tag}`, ephemeral: true });
   }
 
   // --- FINE COMMAND ---
   if (interaction.commandName === "fine") {
     if (!isCop) return interaction.reply({ content: "🚫 Unauthorized.", ephemeral: true });
+    
     await interaction.deferReply({ ephemeral: true });
     const officer = interaction.user;
     const finedUser = interaction.options.getUser("user");
@@ -161,28 +173,34 @@ client.on("interactionCreate", async (interaction) => {
     const amount = interaction.options.getInteger("amount");
 
     const fineNumber = Math.floor(1000000000 + Math.random() * 9000000000);
+    
     const moroorChannel = await interaction.guild.channels.create({
-      name: `${finedUser.id}-fine`,
+      name: `fine-${finedUser.id}`,
       type: ChannelType.GuildText,
       permissionOverwrites: [
         { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
         { id: officer.id, allow: [PermissionsBitField.Flags.ViewChannel] },
         { id: finedUser.id, allow: [PermissionsBitField.Flags.ViewChannel] },
+        { id: process.env.staffRoleId, allow: [PermissionsBitField.Flags.ViewChannel] }
       ],
     });
 
     const embed = new EmbedBuilder()
       .setColor("Grey")
-      .setDescription(`Violation Recorded\nReason: ${reason}\nFine #: ${fineNumber}\nAmount: ${amount}\nPlate: ${plate}`)
+      .setTitle("Traffic Violation Record")
+      .setDescription(`**Reason:** ${reason}\n**Fine Number:** ${fineNumber}\n**Amount:** ${amount}\n**Vehicle Plate:** ${plate}\n**City:** ${city}`)
       .setTimestamp();
 
-    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId("close_fine").setLabel("Close Case").setStyle(ButtonStyle.Danger));
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("close_fine").setLabel("Close Case").setStyle(ButtonStyle.Danger)
+    );
+
     await moroorChannel.send({ content: `<@${finedUser.id}>`, embeds: [embed], components: [row] });
     interaction.editReply({ content: `✅ Fine issued: <#${moroorChannel.id}>` });
   }
 });
 
-// ===== BUTTON HANDLER WITH LOGGING =====
+// ===== BUTTON HANDLER (TRANSCRIPTS & CLOSING) =====
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
 
@@ -191,76 +209,84 @@ client.on("interactionCreate", async (interaction) => {
   const isStaff = member.roles.cache.has(process.env.staffRoleId);
 
   if (interaction.customId === "release_suspect") {
-    if (!isCop) return interaction.reply({ content: "🚫 Officers only.", ephemeral: true });
+    if (!isCop) return interaction.reply({ content: "🚫 Only Officers can release.", ephemeral: true });
 
-    await interaction.reply({ content: "📑 Generating transcript and closing..." });
+    await interaction.reply({ content: "📑 Generating log and closing channel..." });
 
-    // 1. Fetch Stop Metadata
-    const stopData = activeStops.get(interaction.channel.id) || { officer: {tag: "Unknown"}, suspect: {tag: "Unknown"}, addedUsers: [], startTime: "Unknown" };
+    const stopData = activeStops.get(interaction.channel.id) || { officer: interaction.user, suspect: {tag: "N/A", id: "0"}, addedUsers: [], startTime: "Unknown" };
 
-    // 2. Fetch all messages for transcript
+    // Fetch messages
     const messages = await interaction.channel.messages.fetch({ limit: 100 });
-    let transcript = `TRAFFIC STOP LOG\n`;
+    let transcript = `OFFICIAL TRAFFIC STOP TRANSCRIPT\n`;
     transcript += `====================================\n`;
     transcript += `Channel: ${interaction.channel.name}\n`;
-    transcript += `Started: ${stopData.startTime}\n`;
-    transcript += `Officer: ${stopData.officer.tag}\n`;
-    transcript += `Suspect: ${stopData.suspect.tag}\n`;
-    transcript += `Added Users: ${stopData.addedUsers.join(", ") || "None"}\n`;
+    transcript += `Start Time: ${stopData.startTime}\n`;
+    transcript += `Primary Officer: ${stopData.officer.tag} (${stopData.officer.id})\n`;
+    transcript += `Suspect: ${stopData.suspect.tag} (${stopData.suspect.id})\n`;
+    transcript += `Additional People: ${stopData.addedUsers.join(", ") || "None"}\n`;
     transcript += `Closed By: ${interaction.user.tag}\n`;
     transcript += `====================================\n\n`;
 
     const logLines = messages.reverse().map(m => `[${m.createdAt.toLocaleString()}] ${m.author.tag}: ${m.content}`);
     transcript += logLines.join("\n");
 
-    // 3. Send to Logs
     const logChannel = interaction.guild.channels.cache.get(process.env.logChannelId);
     if (logChannel) {
-      const attachment = new AttachmentBuilder(Buffer.from(transcript, "utf-8"), { name: `stop-${interaction.channel.name}.txt` });
+      const attachment = new AttachmentBuilder(Buffer.from(transcript, "utf-8"), { name: `stop-log-${interaction.channel.name}.txt` });
       
       const logEmbed = new EmbedBuilder()
-        .setTitle("🛑 Traffic Stop Closed")
-        .setColor("Green")
+        .setTitle("🛑 Stop Closed & Archived")
+        .setColor("Blue")
         .addFields(
             { name: "Officer", value: `<@${stopData.officer.id}>`, inline: true },
             { name: "Suspect", value: `<@${stopData.suspect.id}>`, inline: true },
-            { name: "Closed By", value: `<@${interaction.user.id}>`, inline: true },
-            { name: "Additional People", value: stopData.addedUsers.join(", ") || "None" }
+            { name: "Additional", value: stopData.addedUsers.join(", ") || "None" }
         )
+        .setFooter({ text: `Case closed by ${interaction.user.tag}` })
         .setTimestamp();
 
       await logChannel.send({ embeds: [logEmbed], files: [attachment] });
     }
 
-    // 4. Cleanup
     activeStops.delete(interaction.channel.id);
     setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
   }
 
-  // Close Fine Button
   if (interaction.customId === "close_fine") {
     if (!isStaff) return interaction.reply({ content: "🚫 Staff only.", ephemeral: true });
-    await interaction.reply({ content: "✅ Closing...", ephemeral: true });
+    await interaction.reply({ content: "✅ Case archived.", ephemeral: true });
     setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
   }
 
-  // End 911 Call Button
   if (interaction.customId === "end_call") {
-    await interaction.reply({ content: "📞 Ending call...", ephemeral: true });
+    await interaction.reply({ content: "📞 Call ended.", ephemeral: true });
     setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
   }
 });
 
-// ===== 911 CALL SYSTEM (Simplified) =====
+// ===== 911 CALL SYSTEM =====
+const LOG_CHANNEL_ID = "1423428971311271976";
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || message.content.toLowerCase() !== "!call 911") return;
+
+  const callerId = message.author.id;
   const callChannel = await message.guild.channels.create({
-    name: `call-${message.author.id}`,
+    name: `call-${callerId}`,
     type: ChannelType.GuildText,
-    permissionOverwrites: [{ id: message.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, { id: message.author.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }],
+    permissionOverwrites: [
+      { id: message.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+      { id: callerId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
+    ],
   });
-  const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId("end_call").setLabel("End Call").setStyle(ButtonStyle.Danger));
-  await callChannel.send({ content: `🚨 911 - How can we help?`, components: [row] });
+
+  const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("end_call").setLabel("End Call").setStyle(ButtonStyle.Danger)
+  );
+
+  await callChannel.send({ content: `🚨 **911 Dispatch**\n<@${callerId}>, how can we help?`, components: [row] });
+  
+  const log = message.guild.channels.cache.get(LOG_CHANNEL_ID);
+  if (log) log.send(`📞 **911 Call Started** by <@${callerId}>`);
 });
 
 client.login(process.env.TOKEN);
