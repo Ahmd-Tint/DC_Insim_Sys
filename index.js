@@ -44,6 +44,7 @@ const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
 // Memory to track stop metadata for the transcript
 const activeStops = new Map();
+const FINE_LOG_CHANNEL_ID = "1423428971311271976"; // Your requested log channel
 
 // ===== COMMANDS =====
 const commands = [
@@ -94,14 +95,8 @@ client.on("interactionCreate", async (interaction) => {
     const suspect = interaction.options.getUser("suspect");
     const channelNameInput = interaction.options.getString("channel_name");
 
-    if (suspect.id === interaction.user.id) {
-      return interaction.reply({ content: "❌ You cannot stop yourself!", ephemeral: true });
-    }
-
     try {
-      // Force parent ID to be a string and check if it exists
       const categoryId = process.env.STOP_CATEGORY_ID ? String(process.env.STOP_CATEGORY_ID).trim() : null;
-
       const stopChannel = await interaction.guild.channels.create({
         name: `stop-${channelNameInput}`,
         type: ChannelType.GuildText,
@@ -130,33 +125,20 @@ client.on("interactionCreate", async (interaction) => {
         components: [row]
       });
 
-      await interaction.reply({ content: `✅ Stop channel created in category: <#${stopChannel.id}>`, ephemeral: true });
+      await interaction.reply({ content: `✅ Stop channel created: <#${stopChannel.id}>`, ephemeral: true });
     } catch (err) {
       console.error(err);
-      interaction.reply({ content: "❌ Error creating channel. Verify `STOP_CATEGORY_ID` in .env is correct.", ephemeral: true });
+      interaction.reply({ content: "❌ Error creating channel.", ephemeral: true });
     }
   }
 
   // --- ADD TO STOP COMMAND ---
   if (interaction.commandName === "add_to_stop") {
     if (!isCop) return interaction.reply({ content: "🚫 Authorized personnel only.", ephemeral: true });
-    if (!interaction.channel.name.startsWith("stop-")) {
-      return interaction.reply({ content: "❌ This command is for Traffic Stop channels only.", ephemeral: true });
-    }
+    if (!interaction.channel.name.startsWith("stop-")) return interaction.reply({ content: "❌ Not a stop channel.", ephemeral: true });
 
     const userToAdd = interaction.options.getUser("user");
-    await interaction.channel.permissionOverwrites.edit(userToAdd.id, {
-      ViewChannel: true,
-      SendMessages: true,
-      ReadMessageHistory: true
-    });
-
-    const stopData = activeStops.get(interaction.channel.id);
-    if (stopData && !stopData.addedUsers.includes(userToAdd.tag)) {
-        stopData.addedUsers.push(userToAdd.tag);
-    }
-
-    await interaction.channel.send(`➕ <@${userToAdd.id}> has been added to the stop by <@${interaction.user.id}>.`);
+    await interaction.channel.permissionOverwrites.edit(userToAdd.id, { ViewChannel: true, SendMessages: true });
     await interaction.reply({ content: `✅ Added ${userToAdd.tag}`, ephemeral: true });
   }
 
@@ -165,6 +147,7 @@ client.on("interactionCreate", async (interaction) => {
     if (!isCop) return interaction.reply({ content: "🚫 Unauthorized.", ephemeral: true });
     
     await interaction.deferReply({ ephemeral: true });
+    
     const officer = interaction.user;
     const finedUser = interaction.options.getUser("user");
     const reason = interaction.options.getString("reason");
@@ -172,14 +155,39 @@ client.on("interactionCreate", async (interaction) => {
     const plate = interaction.options.getString("vehicle");
     const amount = interaction.options.getInteger("amount");
 
+    // 1. Generation
     const fineNumber = Math.floor(1000000000 + Math.random() * 9000000000);
-    
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0]; 
+    const timeStr = now.toTimeString().slice(0, 5);   
+    const dateUnderline = `__${dateStr}__`;
+    const timeUnderline = `__${timeStr}__`;
+
+    // 2. Dynamic Channel Naming
+    const baseName = finedUser.id;
+    const existing = interaction.guild.channels.cache.filter(ch => 
+      ch.name && (ch.name === baseName || ch.name.startsWith(`${baseName}-`))
+    );
+
+    let channelName = baseName;
+    if (existing.size > 0) {
+      let max = 1;
+      existing.forEach(ch => {
+        const m = ch.name.match(new RegExp(`^${baseName}-(\\d+)$`));
+        if (m) {
+          const n = parseInt(m[1], 10);
+          if (n >= max) max = n + 1;
+        } else if (ch.name === baseName) { if (max < 2) max = 2; }
+      });
+      channelName = `${baseName}-${max}`;
+    }
+
     const moroorChannel = await interaction.guild.channels.create({
-      name: `fine-${finedUser.id}`,
+      name: channelName,
       type: ChannelType.GuildText,
       permissionOverwrites: [
         { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-        { id: officer.id, allow: [PermissionsBitField.Flags.ViewChannel] },
+        { id: officer.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
         { id: finedUser.id, allow: [PermissionsBitField.Flags.ViewChannel] },
         { id: process.env.staffRoleId, allow: [PermissionsBitField.Flags.ViewChannel] }
       ],
@@ -187,106 +195,72 @@ client.on("interactionCreate", async (interaction) => {
 
     const embed = new EmbedBuilder()
       .setColor("Grey")
-      .setTitle("Traffic Violation Record")
-      .setDescription(`**Reason:** ${reason}\n**Fine Number:** ${fineNumber}\n**Amount:** ${amount}\n**Vehicle Plate:** ${plate}\n**City:** ${city}`)
+      .setDescription(
+        `Violation recorded:\n` +
+        `${reason}\n` +
+        `Fine Number:\n__${fineNumber}__\n` +
+        `ID:\n${finedUser.id}\n` +
+        `Date:\n${dateUnderline}\n` +
+        `Time:\n${timeUnderline}\n` +
+        `City:\n${city}\n` +
+        `On vehicle:\n${plate}\n` +
+        `Amount: ${amount}`
+      )
+      .setFooter({ text: `You can pay this fine by typing !pay ${officer.tag} ${amount}` })
       .setTimestamp();
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("close_fine").setLabel("Close Case").setStyle(ButtonStyle.Danger)
     );
 
+    // 3. Send to Fine Channel
     await moroorChannel.send({ content: `<@${finedUser.id}>`, embeds: [embed], components: [row] });
-    interaction.editReply({ content: `✅ Fine issued: <#${moroorChannel.id}>` });
+
+    // 4. Log to specific Log Channel (1423428971311271976)
+    const logChannel = interaction.guild.channels.cache.get(FINE_LOG_CHANNEL_ID);
+    if (logChannel) {
+      await logChannel.send({
+        content: `📝 **Fine Logged**\n` +
+                 `**Officer:** ${officer.tag} (${officer.id})\n` +
+                 `**Fined User:** ${finedUser.tag} (${finedUser.id})\n` +
+                 `**Reason:** ${reason}\n` +
+                 `**City:** ${city}\n` +
+                 `**Plate:** ${plate}\n` +
+                 `**Amount:** ${amount}\n` +
+                 `**Fine Number:** ${fineNumber}`
+      });
+    }
+
+    await interaction.editReply({ content: `✅ Fine issued: <#${moroorChannel.id}>` });
   }
 });
 
-// ===== BUTTON HANDLER (TRANSCRIPTS & CLOSING) =====
+// ===== BUTTON HANDLER =====
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
+  const isStaff = (await interaction.guild.members.fetch(interaction.user.id)).roles.cache.has(process.env.staffRoleId);
 
-  const member = await interaction.guild.members.fetch(interaction.user.id);
-  const isCop = member.roles.cache.has(process.env.copRoleId);
-  const isStaff = member.roles.cache.has(process.env.staffRoleId);
-
-  if (interaction.customId === "release_suspect") {
-    if (!isCop) return interaction.reply({ content: "🚫 Only Officers can release.", ephemeral: true });
-
-    await interaction.reply({ content: "📑 Generating log and closing channel..." });
-
-    const stopData = activeStops.get(interaction.channel.id) || { officer: interaction.user, suspect: {tag: "N/A", id: "0"}, addedUsers: [], startTime: "Unknown" };
-
-    // Fetch messages
-    const messages = await interaction.channel.messages.fetch({ limit: 100 });
-    let transcript = `OFFICIAL TRAFFIC STOP TRANSCRIPT\n`;
-    transcript += `====================================\n`;
-    transcript += `Channel: ${interaction.channel.name}\n`;
-    transcript += `Start Time: ${stopData.startTime}\n`;
-    transcript += `Primary Officer: ${stopData.officer.tag} (${stopData.officer.id})\n`;
-    transcript += `Suspect: ${stopData.suspect.tag} (${stopData.suspect.id})\n`;
-    transcript += `Additional People: ${stopData.addedUsers.join(", ") || "None"}\n`;
-    transcript += `Closed By: ${interaction.user.tag}\n`;
-    transcript += `====================================\n\n`;
-
-    const logLines = messages.reverse().map(m => `[${m.createdAt.toLocaleString()}] ${m.author.tag}: ${m.content}`);
-    transcript += logLines.join("\n");
-
-    const logChannel = interaction.guild.channels.cache.get(process.env.logChannelId);
-    if (logChannel) {
-      const attachment = new AttachmentBuilder(Buffer.from(transcript, "utf-8"), { name: `stop-log-${interaction.channel.name}.txt` });
-      
-      const logEmbed = new EmbedBuilder()
-        .setTitle("🛑 Stop Closed & Archived")
-        .setColor("Blue")
-        .addFields(
-            { name: "Officer", value: `<@${stopData.officer.id}>`, inline: true },
-            { name: "Suspect", value: `<@${stopData.suspect.id}>`, inline: true },
-            { name: "Additional", value: stopData.addedUsers.join(", ") || "None" }
-        )
-        .setFooter({ text: `Case closed by ${interaction.user.tag}` })
-        .setTimestamp();
-
-      await logChannel.send({ embeds: [logEmbed], files: [attachment] });
-    }
-
-    activeStops.delete(interaction.channel.id);
-    setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
-  }
-
-  if (interaction.customId === "close_fine") {
-    if (!isStaff) return interaction.reply({ content: "🚫 Staff only.", ephemeral: true });
-    await interaction.reply({ content: "✅ Case archived.", ephemeral: true });
-    setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
-  }
-
-  if (interaction.customId === "end_call") {
-    await interaction.reply({ content: "📞 Call ended.", ephemeral: true });
+  if (interaction.customId === "release_suspect" || interaction.customId === "close_fine" || interaction.customId === "end_call") {
+    if (interaction.customId === "close_fine" && !isStaff) return interaction.reply({ content: "🚫 Staff only.", ephemeral: true });
+    
+    await interaction.reply({ content: "📑 Closing channel..." });
     setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
   }
 });
 
 // ===== 911 CALL SYSTEM =====
-const LOG_CHANNEL_ID = "1423428971311271976";
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || message.content.toLowerCase() !== "!call 911") return;
-
-  const callerId = message.author.id;
   const callChannel = await message.guild.channels.create({
-    name: `call-${callerId}`,
+    name: `call-${message.author.id}`,
     type: ChannelType.GuildText,
     permissionOverwrites: [
       { id: message.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-      { id: callerId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
+      { id: message.author.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
     ],
   });
-
-  const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("end_call").setLabel("End Call").setStyle(ButtonStyle.Danger)
-  );
-
-  await callChannel.send({ content: `🚨 **911 Dispatch**\n<@${callerId}>, how can we help?`, components: [row] });
-  
-  const log = message.guild.channels.cache.get(LOG_CHANNEL_ID);
-  if (log) log.send(`📞 **911 Call Started** by <@${callerId}>`);
+  const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId("end_call").setLabel("End Call").setStyle(ButtonStyle.Danger));
+  await callChannel.send({ content: `🚨 **911 Dispatch**\n<@${message.author.id}>, how can we help?`, components: [row] });
 });
 
 client.login(process.env.TOKEN);
